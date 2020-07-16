@@ -1,0 +1,41 @@
+// Get Invoice Information
+invoiceNumber = invoice.get("invoice_number");
+invoiceId = invoice.get("invoice_id");
+customerName = invoice.get("customer_name");
+// Get CRM Account ID
+customerNameEncoded = zoho.encryption.urlEncode(customerName);
+searchAccounts = invokeurl
+[
+	url :"https://www.zohoapis.com/crm/v2/Accounts/search?criteria=(Account_Name:equals:" + customerNameEncoded + ")"
+	type :GET
+	connection:"crm_modules_full"
+];
+crmAccount = searchAccounts.get("data").get(0);
+crmAccountId = crmAccount.get("id");
+crmAccountName = crmAccount.get("Account_Name");
+// Process line items, serial numbers, and create Equipment records in Zoho CRM
+lineItems = invoice.get("line_items");
+// Iterate through line items to see if there are serial numbers attached
+for each  lineItem in lineItems
+{
+	sku = lineItem.get("sku");
+	itemName = lineItem.get("name");
+	serialNumbers = lineItem.get("serial_numbers");
+	// Iterate through specific serial numbers and check if Equipment record has been created
+	for each  serialNumber in serialNumbers
+	{
+		// Search for existing Equipment record with matching serial number
+		searchEquipment = zoho.crm.searchRecords("Equipment","(Serial_Number:equals:" + serialNumber + ")");
+		// No existing equipment record
+		if(searchEquipment.isEmpty())
+		{
+			equipmentMap = {"Name":itemName + " | " + crmAccountName,"Associated_Account":crmAccountId,"Product_Name":itemName,"Serial_Number":serialNumber,"SKU":sku,"Invoice_Number":invoiceNumber,"Invoice_URL":"https://books.zoho.com/app#/invoices/" + invoiceId,"Status":"Active"};
+			createEquipment = zoho.crm.createRecord("Equipment", equipmentMap);
+		}
+		// Equipment Record Already Exists
+		else
+		{
+			info "Equipment record with serial number " + serialNumber + " already found.";
+		}
+	}
+}
